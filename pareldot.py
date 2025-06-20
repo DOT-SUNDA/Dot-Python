@@ -9,11 +9,18 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 
+# ==========================
+# KONFIGURASI TIME SLEEP
+# ==========================
+SLEEP_SEBELUM_AKSI = 80
+SLEEP_SESUDAH_AKSI = 80
+SLEEP_JIKA_ERROR = 10
+
 def get_options(user_data_dir, profile_dir, position):
     options = webdriver.ChromeOptions()
     options.add_argument(f"user-data-dir={user_data_dir}")
     options.add_argument(f"--profile-directory={profile_dir}")
-    options.add_argument("--headless")  # Versi lama headless
+    options.add_argument("--headless")
     options.add_argument("--window-size=500,500")
     options.add_argument("--disable-extensions")
     options.add_argument("--disable-gpu")
@@ -32,7 +39,7 @@ def read_links_from_file(file_path):
 def process_single_link(driver, link):
     try:
         driver.get(link)
-        wait = WebDriverWait(driver, 60)
+        wait = WebDriverWait(driver, 30)
 
         try:
             trust_button = wait.until(EC.element_to_be_clickable((By.XPATH, "//div[contains(text(), 'I trust the owner of this shared workspace')]")))
@@ -46,7 +53,7 @@ def process_single_link(driver, link):
         except:
             pass
 
-        time.sleep(30)
+        time.sleep(SLEEP_SEBELUM_AKSI)
 
         body = driver.find_element(By.TAG_NAME, "body")
         body.click()
@@ -54,10 +61,10 @@ def process_single_link(driver, link):
         actions = ActionChains(driver)
         actions.key_down(Keys.CONTROL).key_down(Keys.SHIFT).send_keys("c").key_up(Keys.SHIFT).key_up(Keys.CONTROL).perform()
 
-        time.sleep(30)
+        time.sleep(SLEEP_SESUDAH_AKSI)
 
     except:
-        time.sleep(10)
+        time.sleep(SLEEP_JIKA_ERROR)
 
 def worker(user_data_dir, profile_dir, window_position, links_subset):
     if not links_subset:
