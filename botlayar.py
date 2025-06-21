@@ -12,8 +12,8 @@ from selenium.webdriver.common.action_chains import ActionChains
 # ==========================
 # KONFIGURASI TIME SLEEP
 # ==========================
-SLEEP_SEBELUM_AKSI = 80
-SLEEP_SESUDAH_AKSI = 80
+SLEEP_SEBELUM_AKSI = 30
+SLEEP_SESUDAH_AKSI = 30
 SLEEP_JIKA_ERROR = 10
 
 def get_options(user_data_dir, profile_dir, position):
