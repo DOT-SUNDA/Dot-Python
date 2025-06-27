@@ -40,7 +40,6 @@ def update_jadwal():
         if not (0 <= data["buka_menit"] < 60 and 0 <= data["tutup_menit"] < 60):
             return jsonify({"error": "Menit harus antara 0-59"}), 400
 
-        # Pertahankan "nonstop" jika sudah ada
         try:
             with open(WAKTU_FILE, "r") as f:
                 current_data = json.load(f)
@@ -130,9 +129,8 @@ def kill_browser_only():
         pass
 
 def scheduler_loop():
-    last_buka_minute = None
-    last_tutup_minute = None
-    nonstop_running = False
+    last_buka_flag = False
+    last_tutup_flag = False
 
     while True:
         now = datetime.now()
@@ -140,26 +138,28 @@ def scheduler_loop():
         nonstop = jadwal.get("nonstop", False)
 
         if nonstop:
-            if not nonstop_running:
+            if not last_buka_flag:
                 start_target_file()
-                nonstop_running = True
+                last_buka_flag = True
+                print(f"[{now.strftime('%H:%M:%S')}] Mode nonstop aktif, file dijalankan.")
         else:
-            nonstop_running = False
             buka_jam = jadwal.get("buka_jam", 1)
             buka_menit = jadwal.get("buka_menit", 0)
             tutup_jam = jadwal.get("tutup_jam", 2)
             tutup_menit = jadwal.get("tutup_menit", 0)
 
-            if is_time_match(now, buka_jam, buka_menit):
-                if last_buka_minute != now.minute:
-                    start_target_file()
-                    last_buka_minute = now.minute
+            if is_time_match(now, buka_jam, buka_menit) and not last_buka_flag:
+                start_target_file()
+                last_buka_flag = True
+                last_tutup_flag = False  # Reset flag tutup
+                print(f"[{now.strftime('%H:%M:%S')}] Jadwal buka, file dijalankan.")
 
-            if is_time_match(now, tutup_jam, tutup_menit):
-                if last_tutup_minute != now.minute:
-                    kill_target_file()
-                    kill_browser_only()
-                    last_tutup_minute = now.minute
+            if is_time_match(now, tutup_jam, tutup_menit) and not last_tutup_flag:
+                kill_target_file()
+                kill_browser_only()
+                last_tutup_flag = True
+                last_buka_flag = False  # Reset flag buka
+                print(f"[{now.strftime('%H:%M:%S')}] Jadwal tutup, file dihentikan.")
 
         time.sleep(30)
 
