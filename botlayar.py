@@ -1,22 +1,22 @@
-import os
-import time
-from datetime import datetime
-from multiprocessing import Process
+from multiprocessing import Process, Barrier
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from datetime import datetime
+import os, time
 
-# ==========================
-# KONFIGURASI TIME SLEEP
-# ==========================
 SLEEP_SEBELUM_AKSI = 30
 SLEEP_SESUDAH_AKSI = 30
 SLEEP_JIKA_ERROR = 10
 
-def get_options(user_data_dir, profile_dir, position):
+def log_sukses(profile_name, current, total):
+    # Mudah diubah, misalnya log ke file atau tampilkan lebih detail
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] {profile_name} berhasil proses link {current}/{total}", flush=True)
+
+def get_options(user_data_dir, profile_dir):
     options = webdriver.ChromeOptions()
     options.add_argument(f"user-data-dir={user_data_dir}")
     options.add_argument(f"--profile-directory={profile_dir}")
@@ -28,87 +28,106 @@ def get_options(user_data_dir, profile_dir, position):
     options.add_experimental_option('excludeSwitches', ['enable-logging'])
     return options
 
-def read_links_from_file(file_path):
-    if not os.path.exists(file_path):
+def read_links_from_file(path):
+    if not os.path.exists(path):
         return []
-    with open(file_path, 'r') as file:
-        links = file.readlines()
-    return [link.strip() for link in links if link.strip()]
+    with open(path, 'r') as f:
+        return [line.strip() for line in f if line.strip()]
 
 def process_single_link(driver, link):
     try:
         driver.get(link)
-        wait = WebDriverWait(driver, 30)
+        wait = WebDriverWait(driver, 10)
 
         try:
-            trust_button = wait.until(EC.element_to_be_clickable((By.XPATH, "//div[contains(text(), 'I trust the owner of this shared workspace')]")))
-            trust_button.click()
-        except:
-            pass
+            trust = wait.until(EC.element_to_be_clickable((By.XPATH, "//div[contains(text(), 'I trust the owner')]")))
+            trust.click()
+        except: pass
 
         try:
-            open_workspace_button = wait.until(EC.element_to_be_clickable((By.XPATH, "//span[contains(text(), 'Open Workspace')]")))
-            open_workspace_button.click()
-        except:
-            pass
+            open_ws = wait.until(EC.element_to_be_clickable((By.XPATH, "//span[contains(text(), 'Open Workspace')]")))
+            open_ws.click()
+        except: pass
 
         time.sleep(SLEEP_SEBELUM_AKSI)
 
-        body = driver.find_element(By.TAG_NAME, "body")
-        body.click()
-
+        driver.find_element(By.TAG_NAME, "body").click()
         actions = ActionChains(driver)
         actions.key_down(Keys.CONTROL).key_down(Keys.SHIFT).send_keys("c").key_up(Keys.SHIFT).key_up(Keys.CONTROL).perform()
 
         time.sleep(SLEEP_SESUDAH_AKSI)
 
+        return True
     except:
         time.sleep(SLEEP_JIKA_ERROR)
+        return False  # Tidak ditampilkan di log
 
-def worker(user_data_dir, profile_dir, window_position, links_subset):
-    if not links_subset:
+def worker(profile_name, user_data_dir, profile_dir, links, barrier: Barrier):
+    if not links:
         return
 
-    options = get_options(user_data_dir, profile_dir, window_position)
+    options = get_options(user_data_dir, profile_dir)
     driver = webdriver.Chrome(options=options)
 
+    total = len(links)
     index = 0
+    count = 0
+
     while True:
-        process_single_link(driver, links_subset[index])
-        index = (index + 1) % len(links_subset)
+        success = process_single_link(driver, links[index])
+        if success:
+            count += 1
+            log_sukses(profile_name, count, total)
+
+        try:
+            barrier.wait()  # Tunggu semua proses sebelum lanjut
+        except:
+            break
+
+        index = (index + 1) % total
 
 if __name__ == "__main__":
     user_profiles = [
         {
+            "name": "Profile1",
             "user_data_dir": r"C:\Users\Administrator\Desktop\Profile1",
             "profile_dir": "Default",
-            "window_position": (0, 100)
         },
         {
+            "name": "Profile2",
             "user_data_dir": r"C:\Users\Administrator\Desktop\Profile2",
             "profile_dir": "Default",
-            "window_position": (0, 300)
         },
     ]
 
     all_links = read_links_from_file("link.txt")
     if not all_links:
+        print("link.txt kosong, keluar.")
         exit(1)
 
+    # Bagi link ke masing-masing profil
     links_for_profiles = [[] for _ in user_profiles]
     for i, link in enumerate(all_links):
         links_for_profiles[i % len(user_profiles)].append(link)
 
+    barrier = Barrier(len(user_profiles))
+
     processes = []
     for i, profile in enumerate(user_profiles):
         p = Process(target=worker, args=(
+            profile['name'],
             profile['user_data_dir'],
             profile['profile_dir'],
-            profile['window_position'],
-            links_for_profiles[i]
+            links_for_profiles[i],
+            barrier
         ))
         p.start()
         processes.append(p)
 
-    for p in processes:
-        p.join()
+    try:
+        while True:
+            time.sleep(60)
+    except KeyboardInterrupt:
+        print("Dihentikan oleh pengguna.")
+        for p in processes:
+            p.terminate()
