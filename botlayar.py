@@ -101,11 +101,13 @@ if __name__ == "__main__":
             "name": "Profile1",
             "user_data_dir": r"C:\Users\Administrator\Desktop\Profile1",
             "profile_dir": "Default",
+            "window_position": (0, 100)
         },
         {
             "name": "Profile2",
             "user_data_dir": r"C:\Users\Administrator\Desktop\Profile2",
             "profile_dir": "Default",
+            "window_position": (0, 300)
         },
     ]
 
@@ -127,6 +129,7 @@ if __name__ == "__main__":
             profile['name'],
             profile['user_data_dir'],
             profile['profile_dir'],
+            profile['window_position'],
             links_for_profiles[i],
             barrier
         ))
