@@ -48,16 +48,22 @@ def update_jadwal():
 def update_link():
     try:
         data = request.get_json()
-        if "links" not in data or not isinstance(data["links"], list):
-            return jsonify({"error": "Data 'links' harus berupa list"}), 400
+        if not data or "link" not in data or not isinstance(data["link"], str):
+            return jsonify({"error": "Data 'link' harus berupa string"}), 400
 
-        with open(LINK_FILE, "w") as f:
-            for link in data["links"]:
-                f.write(link.strip() + "\n")
+        # Ambil data link, pecah per baris
+        links = [line.strip() for line in data["link"].splitlines() if line.strip()]
 
-        return jsonify({"success": True, "message": "Link berhasil diperbarui"}), 200
-    except:
-        return jsonify({"error": "Gagal memperbarui link"}), 500
+        with open("link.txt", "w") as f:
+            for link in links:
+                f.write(link + "\n")
+
+        return jsonify({
+            "success": True,
+            "message": f"{len(links)} link disimpan"
+        }), 200
+    except Exception as e:
+        return jsonify({"error": f"Gagal menyimpan link: {str(e)}"}), 500
 
 @app.route("/start-script", methods=["POST"])
 def start_script():
