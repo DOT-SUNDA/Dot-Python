@@ -48,6 +48,54 @@ def stop_script():
         return jsonify({"success": True, "message": "Script & browser dihentikan"}), 200
     except:
         return jsonify({"error": "Gagal menghentikan script"}), 500
+        
+@app.route("/get-jadwal", methods=["GET"])
+def get_jadwal():
+    if not os.path.exists(WAKTU_FILE):
+        return jsonify({"error": "waktu.json tidak ditemukan"}), 404
+    with open(WAKTU_FILE, "r") as f:
+        return jsonify(json.load(f))
+
+@app.route("/update-waktu", methods=["POST"])
+def update_jadwal():
+    try:
+        data = request.get_json()
+        for key in ["buka_jam", "buka_menit", "tutup_jam", "tutup_menit"]:
+            if key not in data:
+                return jsonify({"error": f"Parameter '{key}' hilang"}), 400
+
+        if not (0 <= data["buka_jam"] < 24 and 0 <= data["tutup_jam"] < 24):
+            return jsonify({"error": "Jam harus 0–23"}), 400
+        if not (0 <= data["buka_menit"] < 60 and 0 <= data["tutup_menit"] < 60):
+            return jsonify({"error": "Menit harus 0–59"}), 400
+
+        with open(WAKTU_FILE, "w") as f:
+            json.dump(data, f, indent=4)
+
+        return jsonify({"success": True, "message": "Jadwal diperbarui"}), 200
+    except:
+        return jsonify({"error": "Gagal memperbarui jadwal"}), 500
+
+@app.route("/update-link", methods=["POST"])
+def update_link():
+    try:
+        data = request.get_json()
+        if not data or "link" not in data or not isinstance(data["link"], str):
+            return jsonify({"error": "Data 'link' harus berupa string"}), 400
+
+        links = [line.strip() for line in data["link"].splitlines() if line.strip()]
+
+        with open(LINK_FILE, "w") as f:
+            for link in links:
+                f.write(link + "\n")
+
+        return jsonify({
+            "success": True,
+            "message": f"{len(links)} link disimpan"
+        }), 200
+    except Exception as e:
+        return jsonify({"error": f"Gagal menyimpan link: {str(e)}"}), 500
+
 
 # ========== FUNGSI UTAMA ==========
 
