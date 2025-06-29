@@ -6,7 +6,8 @@ from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from datetime import datetime
-import os, time
+import os
+import time
 
 SLEEP_SEBELUM_AKSI = 30
 SLEEP_SESUDAH_AKSI = 30
@@ -47,36 +48,40 @@ def process_single_link(driver, link):
     try:
         driver.get(link)
         wait = WebDriverWait(driver, 10)
-
+        
         try:
             trust = wait.until(EC.element_to_be_clickable((By.XPATH, "//div[contains(text(), 'I trust the owner')]")))
             trust.click()
         except: pass
-
+        
         try:
             open_ws = wait.until(EC.element_to_be_clickable((By.XPATH, "//span[contains(text(), 'Open Workspace')]")))
             open_ws.click()
         except: pass
-
+        
         time.sleep(SLEEP_SEBELUM_AKSI)
-
+        
         driver.find_element(By.TAG_NAME, "body").click()
         actions = ActionChains(driver)
         actions.key_down(Keys.CONTROL).key_down(Keys.SHIFT).send_keys("c").key_up(Keys.SHIFT).key_up(Keys.CONTROL).perform()
-
+        
         time.sleep(SLEEP_SESUDAH_AKSI)
-
+        
         return True
     except:
         time.sleep(SLEEP_JIKA_ERROR)
-        return False  # Tidak ditampilkan di log
+        return False
 
-def worker(profile_name, user_data_dir, profile_dir, links, barrier: Barrier):
+def worker(profile_name, user_data_dir, profile_dir, window_position, links, barrier: Barrier):
     if not links:
         return
 
     options = get_options(user_data_dir, profile_dir)
     driver = webdriver.Chrome(options=options)
+
+    # Atur posisi jendela
+    if window_position:
+        driver.set_window_position(*window_position)
 
     total = len(links)
     index = 0
