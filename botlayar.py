@@ -20,12 +20,21 @@ def get_options(user_data_dir, profile_dir):
     options = webdriver.ChromeOptions()
     options.add_argument(f"user-data-dir={user_data_dir}")
     options.add_argument(f"--profile-directory={profile_dir}")
+    options.add_argument("--disable-popup-blocking")
+    options.add_argument("--disable-session-crashed-bubble")
+    options.add_argument("--disable-infobars")
+    options.add_argument("--disable-features=InfiniteSessionRestore")
     options.add_argument("--window-size=500,500")
     options.add_argument("--disable-extensions")
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    options.add_experimental_option('excludeSwitches', ['enable-logging'])
+    options.add_experimental_option("excludeSwitches", ["enable-automation", "enable-logging"])
+    options.add_experimental_option("prefs", {
+        "profile.default_content_setting_values.notifications": 2,
+        "credentials_enable_service": False,
+        "profile.password_manager_enabled": False
+    })
     return options
 
 def read_links_from_file(path):
