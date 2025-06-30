@@ -48,7 +48,7 @@ def stop_script():
         return jsonify({"success": True, "message": "Script & browser dihentikan"}), 200
     except:
         return jsonify({"error": "Gagal menghentikan script"}), 500
-        
+
 @app.route("/get-jadwal", methods=["GET"])
 def get_jadwal():
     if not os.path.exists(WAKTU_FILE):
@@ -96,6 +96,12 @@ def update_link():
     except Exception as e:
         return jsonify({"error": f"Gagal menyimpan link: {str(e)}"}), 500
 
+@app.route("/get-active-file", methods=["GET"])
+def get_active():
+    file_name = get_active_file()
+    if file_name:
+        return jsonify({"active_file": file_name}), 200
+    return jsonify({"message": "Belum ada file aktif"}), 404
 
 # ========== FUNGSI UTAMA ==========
 
@@ -134,14 +140,12 @@ def kill_target_file():
     finally:
         if os.path.exists(PID_FILE):
             os.remove(PID_FILE)
-        if os.path.exists(ACTIVE_FILE):
-            os.remove(ACTIVE_FILE)
+        # Jangan hapus active_file.json agar bisa auto start lagi
 
-# ========== Jadwal ==========
+# ========== Jadwal Otomatis ==========
 
 def scheduler_loop():
-    last_buka = False
-    last_tutup = False
+    last_status = None  # "buka", "tutup", atau None
 
     while True:
         now = datetime.now()
@@ -152,20 +156,25 @@ def scheduler_loop():
         tutup_jam = jadwal.get("tutup_jam", 2)
         tutup_menit = jadwal.get("tutup_menit", 0)
 
-        if is_time_match(now, buka_jam, buka_menit) and not last_buka:
-            active_file = get_active_file()
-            if active_file:
-                start_target_file(active_file)
-            last_buka = True
-            last_tutup = False
+        if is_time_match(now, buka_jam, buka_menit):
+            if last_status != "buka":
+                print(f"[{now.strftime('%H:%M')}] Waktu buka!")
+                active_file = get_active_file()
+                if active_file:
+                    print(f"Menjalankan file: {active_file}")
+                    start_target_file(active_file)
+                else:
+                    print("Tidak ada file aktif.")
+                last_status = "buka"
 
-        if is_time_match(now, tutup_jam, tutup_menit) and not last_tutup:
-            kill_target_file()
-            kill_browser_only()
-            last_tutup = True
-            last_buka = False
+        elif is_time_match(now, tutup_jam, tutup_menit):
+            if last_status != "tutup":
+                print(f"[{now.strftime('%H:%M')}] Waktu tutup!")
+                kill_target_file()
+                kill_browser_only()
+                last_status = "tutup"
 
-        time.sleep(30)
+        time.sleep(10)
 
 def is_time_match(now, hour, minute):
     return now.hour == hour and now.minute == minute
@@ -190,6 +199,7 @@ def no_output(_):
     return "", 204
 
 # ========== JALANKAN ==========
+
 if __name__ == "__main__":
     Thread(target=scheduler_loop, daemon=True).start()
     app.run(host="0.0.0.0", port=5000)
