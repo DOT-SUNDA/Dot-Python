@@ -58,5 +58,8 @@ try:
     driver = webdriver.Chrome(options=options)
     process_links(driver)
     print("Selesai memproses semua link. Browser tetap terbuka.")
+    
+    # Tambahan agar Python tidak keluar (Chrome tidak tertutup)
+    input("Tekan ENTER jika ingin menutup browser secara manual...")
 except Exception as e:
     print(f"Terjadi error: {e}")
