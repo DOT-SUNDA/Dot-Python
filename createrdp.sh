@@ -2,16 +2,16 @@
 
 # Daftar IP VPS
 VPS_LIST=(
-188.166.176.108
-159.223.65.149
-157.230.42.21
-159.223.37.153
-157.245.192.4
-143.198.200.139
-178.128.50.218
-167.71.209.50
-206.189.152.232
-178.128.209.113
+134.209.102.131
+188.166.251.27
+152.42.250.76
+128.199.248.129
+165.22.240.225
+157.245.52.227
+206.189.151.72
+139.59.121.134
+165.22.245.171
+152.42.226.66
 )
 
 # Password SSH
@@ -39,7 +39,7 @@ expect {
 expect "#" {
     send -- "wget -O reinstall.sh https://raw.githubusercontent.com/bin456789/reinstall/refs/heads/main/reinstall.sh\r"
     expect "#"
-    send -- "bash reinstall.sh dd --img \"http://103.126.226.217:8000/dotajav2.gz\" --rdp-port 2003 --password \"jokoaja\"\r"
+    send -- "bash reinstall.sh dd --img \"http://188.166.176.108/dotajav2.gz\" --rdp-port 2003 --password \"jokoaja\"\r"
     expect "#"
     send -- "reboot\r"
 }
