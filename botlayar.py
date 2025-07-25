@@ -14,20 +14,8 @@ SLEEP_SESUDAH_AKSI = 30
 SLEEP_JIKA_ERROR = 10
 
 def log_sukses(profile_name, current, total):
-    # Simpan status log ke file sementara per profil
-    with open(f"{profile_name}.logtmp", "w") as f:
-        f.write(f"[{datetime.now().strftime('%H:%M:%S')}] {profile_name} ▶ link {current}/{total}")
-
-    # Clear layar
-    os.system('cls' if os.name == 'nt' else 'clear')
-
-    # Ambil dan tampilkan semua log sementara yang tersedia (maksimal 2 baris aktif)
-    for pname in ["Profile1", "Profile2"]:
-        try:
-            with open(f"{pname}.logtmp", "r") as f:
-                print(f.read())
-        except:
-            pass
+    # Mudah diubah, misalnya log ke file atau tampilkan lebih detail
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] {profile_name} berhasil proses link {current}/{total}", flush=True)
 
 def get_options(user_data_dir, profile_dir):
     options = webdriver.ChromeOptions()
