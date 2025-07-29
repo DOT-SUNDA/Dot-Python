@@ -2,19 +2,20 @@
 
 # Daftar IP VPS
 VPS_LIST=(
-188.166.251.27
-152.42.250.76
-128.199.248.129
-165.22.240.225
-157.245.52.227
-206.189.151.72
-139.59.121.134
-165.22.245.171
-152.42.226.66
+159.223.79.28
+146.190.95.49
+143.198.83.30
+152.42.220.220
+128.199.174.92
+139.59.231.99
+206.189.155.111
+167.172.66.175
+139.59.227.120
+159.223.39.191
 )
 
 # Password SSH
-PASSWORD="jokoaja"
+PASSWORD="VPS@2BULAN"
 
 # Cek apakah expect tersedia
 if ! command -v expect &> /dev/null; then
@@ -36,10 +37,11 @@ expect {
     "*assword:" { send "$PASSWORD\r" }
 }
 expect "#" {
-    send -- "/trans.sh\r"
+    send -- "wget -O reinstall.sh https://raw.githubusercontent.com/bin456789/reinstall/refs/heads/main/reinstall.sh\r"
     expect "#"
-    send -- "\r"
+    send -- "bash reinstall.sh dd --img \"http://143.198.222.5/dotajav2.gz\" --rdp-port 2003 --password \"jokoaja\"\r"
     expect "#"
+    send -- "reboot\r"
 }
 # Menunggu koneksi terputus karena reboot
 expect {
