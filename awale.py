@@ -196,12 +196,6 @@ if __name__ == "__main__":
             "profile_dir": "Default",
             "window_position": (0, 0)
         },
-        {
-            "name": "Profile2",
-            "user_data_dir": r"C:\Users\Administrator\Desktop\Profile2",
-            "profile_dir": "Default",
-            "window_position": (0, 0)
-        },
     ]
 
     all_links = read_links_from_file("link.txt")
