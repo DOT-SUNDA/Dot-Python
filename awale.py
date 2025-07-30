@@ -74,14 +74,12 @@ def find_and_click_rebuild(driver):
             except TimeoutException:
                 print(f"[{datetime.now()}] [INFO] Tombol 'Rebuild Environment' tidak ditemukan di iframe index {i}")
             finally:
-                actions = ActionChains(driver)
-                actions.send_keys(Keys.ENTER)
-                actions.perform()
-                time.sleep(SLEEP_SESUDAH_AKSI)
+                driver.switch_to.default_content()
 
         print(f"[{datetime.now()}] [WARNING] Tombol 'Rebuild Environment' tidak ditemukan di semua iframe.")
         driver.switch_to.default_content()
         driver.refresh()
+        time.sleep(2)
         actions = ActionChains(driver)
         actions.send_keys(Keys.ENTER)
         actions.perform()
@@ -91,6 +89,7 @@ def find_and_click_rebuild(driver):
         print(f"[{datetime.now()}] [ERROR] Gagal cari/klik tombol 'Rebuild Environment': {e}")
         driver.switch_to.default_content()
         driver.refresh()
+        time.sleep(2)
         actions = ActionChains(driver)
         actions.send_keys(Keys.ENTER)
         actions.perform()
@@ -156,6 +155,8 @@ def process_single_link(driver, link):
         time.sleep(SLEEP_SEBELUM_AKSI)
         
         open_terminal_and_run(driver)
+
+        time.sleep(SLEEP_SESUDAH_AKSI)
         
         return True
     except:
@@ -183,7 +184,7 @@ def worker(profile_name, user_data_dir, profile_dir, window_position, links, bar
             log_sukses(profile_name, count, total)
 
         try:
-            time.sleep(3)  # Tunggu semua proses sebelum lanjut
+            barrier.wait()  # Tunggu semua proses sebelum lanjut
         except:
             break
 
