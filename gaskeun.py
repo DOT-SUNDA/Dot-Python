@@ -1,4 +1,4 @@
-from multiprocessing import Process, Barrier
+from multiprocessing import Process
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -9,7 +9,6 @@ from datetime import datetime
 import os
 import time
 
-# Konfigurasi
 SLEEP_SEBELUM_AKSI = 30
 SLEEP_SESUDAH_AKSI = 30
 SLEEP_JIKA_ERROR = 10
@@ -19,6 +18,9 @@ def log_sukses(profile_name, current, total):
 
 def log_error(profile_name, link, error):
     print(f"[{datetime.now().strftime('%H:%M:%S')}] {profile_name} error pada link {link}: {str(error)}", flush=True)
+
+def log_element_not_found(profile_name, element_name):
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] {profile_name} elemen '{element_name}' tidak ditemukan, melanjutkan...", flush=True)
 
 def get_options(user_data_dir, profile_dir):
     options = webdriver.ChromeOptions()
@@ -47,18 +49,6 @@ def read_links_from_file(path):
     with open(path, 'r') as f:
         return [line.strip() for line in f if line.strip()]
 
-def split_links_equally(links, num_profiles):
-    """Membagi link secara merata dengan menjaga urutan"""
-    chunk_size = len(links) // num_profiles
-    remainder = len(links) % num_profiles
-    result = []
-    index = 0
-    for i in range(num_profiles):
-        end = index + chunk_size + (1 if i < remainder else 0)
-        result.append(links[index:end])
-        index = end
-    return result
-
 def process_single_link(driver, link, profile_name):
     try:
         driver.get(link)
@@ -67,97 +57,80 @@ def process_single_link(driver, link, profile_name):
         try:
             trust = wait.until(EC.element_to_be_clickable((By.XPATH, "//div[contains(text(), 'I trust the owner')]")))
             trust.click()
-            time.sleep(2)
         except Exception as e:
-            pass
+            log_element_not_found(profile_name, "I trust the owner")
+            return False
         
         try:
             open_ws = wait.until(EC.element_to_be_clickable((By.XPATH, "//span[contains(text(), 'Open Workspace')]")))
             open_ws.click()
-            time.sleep(2)
         except Exception as e:
-            pass
+            log_element_not_found(profile_name, "Open Workspace")
+            return False
         
         time.sleep(SLEEP_SEBELUM_AKSI)
         
-        driver.find_element(By.TAG_NAME, "body").click()
-        actions = ActionChains(driver)
-        actions.key_down(Keys.CONTROL).key_down(Keys.SHIFT).send_keys("c").key_up(Keys.SHIFT).key_up(Keys.CONTROL).perform()
+        try:
+            driver.find_element(By.TAG_NAME, "body").click()
+            actions = ActionChains(driver)
+            actions.key_down(Keys.CONTROL).key_down(Keys.SHIFT).send_keys("c").key_up(Keys.SHIFT).key_up(Keys.CONTROL).perform()
+        except Exception as e:
+            log_error(profile_name, link, e)
+            return False
         
         time.sleep(SLEEP_SESUDAH_AKSI)
         return True
+        
     except Exception as e:
         log_error(profile_name, link, e)
         time.sleep(SLEEP_JIKA_ERROR)
         return False
 
-def worker(profile_name, user_data_dir, profile_dir, window_position, links, barrier: Barrier):
+def worker(profile_name, user_data_dir, profile_dir, window_position, links):
     if not links:
-        print(f"{profile_name} tidak mendapatkan link untuk diproses")
+        print(f"{profile_name} tidak memiliki link untuk diproses")
         return
 
-    try:
-        options = get_options(user_data_dir, profile_dir)
-        driver = webdriver.Chrome(options=options)
-        
-        if window_position:
-            driver.set_window_position(*window_position)
-            driver.set_window_size(500, 500)
+    options = get_options(user_data_dir, profile_dir)
+    driver = webdriver.Chrome(options=options)
+    
+    if window_position:
+        driver.set_window_position(*window_position)
 
+    while True:
         total = len(links)
         count = 0
 
-        while True:
-            for i, link in enumerate(links):
-                success = process_single_link(driver, link, profile_name)
-                if success:
-                    count += 1
-                    log_sukses(profile_name, count, total)
-
-                try:
-                    barrier.wait()  # Tunggu semua proses sebelum lanjut
-                except:
-                    break
-
-    except Exception as e:
-        print(f"Error pada worker {profile_name}: {str(e)}")
-    finally:
-        try:
-            driver.quit()
-        except:
-            pass
+        for index, link in enumerate(links):
+            success = process_single_link(driver, link, profile_name)
+            if success:
+                count += 1
+                log_sukses(profile_name, count, total)
 
 if __name__ == "__main__":
-    # Konfigurasi profil
     user_profiles = [
         {
             "name": "Profile1",
             "user_data_dir": r"C:\Users\Administrator\Desktop\Profile1",
             "profile_dir": "Default",
-            "window_position": (0, 0)  # Posisi jendela pertama
+            "window_position": (0, 0)
         },
         {
             "name": "Profile2",
             "user_data_dir": r"C:\Users\Administrator\Desktop\Profile2",
             "profile_dir": "Default",
-            "window_position": (500, 0)  # Posisi jendela kedua
+            "window_position": (0, 150)
         },
     ]
 
-    # Baca link dari file
     all_links = read_links_from_file("link.txt")
     if not all_links:
         print("link.txt kosong, keluar.")
         exit(1)
 
-    # Bagi link secara merata
-    links_for_profiles = split_links_equally(all_links, len(user_profiles))
-
-    # Tampilkan pembagian link
-    for i, profile in enumerate(user_profiles):
-        print(f"{profile['name']} mendapatkan {len(links_for_profiles[i])} link")
-
-    barrier = Barrier(len(user_profiles))
+    links_for_profiles = [[] for _ in user_profiles]
+    for i, link in enumerate(all_links):
+        links_for_profiles[i % len(user_profiles)].append(link)
 
     processes = []
     for i, profile in enumerate(user_profiles):
@@ -166,11 +139,11 @@ if __name__ == "__main__":
             profile['user_data_dir'],
             profile['profile_dir'],
             profile['window_position'],
-            links_for_profiles[i],
-            barrier
+            links_for_profiles[i]
         ))
         p.start()
         processes.append(p)
+        print(f"Memulai proses untuk {profile['name']} dengan {len(links_for_profiles[i])} link")
 
     try:
         while True:
@@ -181,4 +154,4 @@ if __name__ == "__main__":
             p.terminate()
         for p in processes:
             p.join()
-        print("Semua proses dihentikan")
+        print("Semua proses dihentikan.")
