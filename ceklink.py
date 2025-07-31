@@ -20,7 +20,6 @@ CONFIG = {
     'MAX_TELEGRAM_REQUESTS': 5,  # Max requests per minute
     'CHROME_TIMEOUT': 20,
     'MAX_RETRIES': 2,
-    'PROCESS_TIMEOUT': 300,  # 5 minutes timeout per process
     'TELEGRAM_TOKEN': '8455364218:AAFoy_mvhZi9HYeTM48hO9aXapE-cYmWuCs',
     'TELEGRAM_CHAT_ID': '6501677690'
 }
@@ -102,6 +101,7 @@ def read_links_from_file(path):
 
 def process_single_link(driver, link, retry_count=0):
     try:
+        logger.info(f"Processing link: {link}")  # Log the complete link being processed
         driver.get(link)
         wait = WebDriverWait(driver, CONFIG['CHROME_TIMEOUT'])
         
@@ -161,16 +161,12 @@ def worker(profile_name, user_data_dir, profile_dir, window_position, links, res
         if window_position:
             driver.set_window_position(*window_position)
 
-        start_time = time.time()
-        
-        for i, link in enumerate(links, 1):
-            if time.time() - start_time > CONFIG['PROCESS_TIMEOUT']:
-                logger.warning(f"Worker {profile_name} timeout reached")
-                break
-                
-            logger.debug(f"{profile_name} processing link {i}/{len(links)}: {link}")
+        for i, link in enumerate(links, 1):                
+            logger.info(f"{profile_name} processing link {i}/{len(links)}: {link}")
             if process_single_link(driver, link):
                 success_links.append(link)
+            else:
+                logger.warning(f"Failed to process link: {link}")
                 
         result_queue.put((profile_name, success_links))
         
@@ -254,11 +250,17 @@ if __name__ == "__main__":
             f.write("\n".join(all_success) + "\n")
         
         # Send to Telegram
-        send_to_telegram(
+        if send_to_telegram(
             success_filename,
             f"✅ Total Success: {len(all_success)}/{len(all_links)}\n"
             f"⏱️ Completed at: {timestamp.replace('_', ' ')}"
-        )
+        ):
+            # Delete sukses.txt after successful Telegram send
+            try:
+                os.remove("sukses.txt")
+                logger.info("sukses.txt deleted after successful Telegram send")
+            except Exception as e:
+                logger.error(f"Error deleting sukses.txt: {e}")
         
         logger.info(f"Process completed. Success rate: {len(all_success)}/{len(all_links)}")
     else:
