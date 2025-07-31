@@ -5,13 +5,23 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import time
+import sys
 
+# Konfigurasi Waktu
 SLEEP_SEBELUM_AKSI = 30
 SLEEP_SESUDAH_AKSI = 30
 SLEEP_JIKA_ERROR = 10
+LOG_CLEAR_INTERVAL = 3600  # 1 jam dalam detik
+
+# Variabel global untuk waktu terakhir clear log
+last_log_clear_time = datetime.now()
+
+def clear_screen():
+    """Membersihkan layar console"""
+    os.system('cls' if os.name == 'nt' else 'clear')
 
 def log_sukses(profile_name, current, total):
     print(f"[{datetime.now().strftime('%H:%M:%S')}] {profile_name} berhasil proses link {current}/{total}", flush=True)
@@ -21,6 +31,14 @@ def log_error(profile_name, link, error):
 
 def log_element_not_found(profile_name, element_name):
     print(f"[{datetime.now().strftime('%H:%M:%S')}] {profile_name} elemen '{element_name}' tidak ditemukan, melanjutkan...", flush=True)
+
+def check_and_clear_logs():
+    global last_log_clear_time
+    now = datetime.now()
+    if (now - last_log_clear_time).total_seconds() >= LOG_CLEAR_INTERVAL:
+        clear_screen()
+        print(f"[{now.strftime('%H:%M:%S')}] Log telah dibersihkan")
+        last_log_clear_time = now
 
 def get_options(user_data_dir, profile_dir):
     options = webdriver.ChromeOptions()
@@ -102,6 +120,7 @@ def worker(profile_name, user_data_dir, profile_dir, window_position, links):
         count = 0
 
         for index, link in enumerate(links):
+            check_and_clear_logs()  # Cek apakah perlu clear log
             success = process_single_link(driver, link, profile_name)
             if success:
                 count += 1
