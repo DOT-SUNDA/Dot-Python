@@ -1,5 +1,6 @@
 import requests
 import os
+import re
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import (
     ApplicationBuilder,
@@ -18,325 +19,260 @@ PORT = 5000
 IP_FILE = 'ip_list.txt'
 
 # ====== STATE KONVERSASI ======
-LINKS, BUKA, TUTUP, ADD_IP = range(4)
-TARGET_TYPE = None  # Untuk menyimpan pilihan target (1=Rebuild, 2=Looping)
+SET_LINK, SET_BUKA, SET_TUTUP, ADD_IP = range(4)
 
-# ====== MANAJEMEN IP ======
+# ====== INISIALISASI ======
 def load_ips():
-    """Memuat daftar IP dari file"""
     if not os.path.exists(IP_FILE):
         return []
     with open(IP_FILE, 'r') as f:
         return [line.strip() for line in f if line.strip()]
 
 def save_ips(ips):
-    """Menyimpan daftar IP ke file"""
     with open(IP_FILE, 'w') as f:
         for ip in ips:
             f.write(ip + '\n')
 
 # ====== HANDLER UTAMA ======
 async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Menampilkan menu panel utama"""
     if update.effective_user.id != AUTHORIZED_USER_ID:
-        await update.message.reply_text("⛔ Akses ditolak. Anda tidak diotorisasi.")
+        await update.message.reply_text("⛔ Akses ditolak.")
         return
 
     keyboard = [
-        [InlineKeyboardButton("✅ Set Link & Jadwal", callback_data='setlink')],
-        [InlineKeyboardButton("▶️ Start All", callback_data='startall')],
-        [InlineKeyboardButton("⏹ Stop All", callback_data='stopall')],
-        [InlineKeyboardButton("⚙️ Manage IP", callback_data='manageip')]
+        [InlineKeyboardButton("✅ Set Link & Jadwal", callback_data='set_link')],
+        [InlineKeyboardButton("⚙️ Manage IP", callback_data='manage_ip')],
+        [InlineKeyboardButton("▶️ Start All", callback_data='start_all')],
+        [InlineKeyboardButton("⏹ Stop All", callback_data='stop_all')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text('🛠️ Panel Kontrol Bot - Pilih aksi:', reply_markup=reply_markup)
+    await update.message.reply_text('🛠️ Panel Kontrol:', reply_markup=reply_markup)
 
-# ====== HANDLER TOMBOL ======
-async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Menangani semua aksi dari tombol inline"""
-    query = update.callback_query
-    await query.answer()
-
-    if update.effective_user.id != AUTHORIZED_USER_ID:
-        await query.edit_message_text("⛔ Akses ditolak. Anda tidak diotorisasi.")
-        return
-
-    data = query.data
-
-    if data == 'startall':
-        await handle_start_all(query)
-    elif data == 'stopall':
-        await handle_stop_all(query)
-    elif data == 'setlink':
-        await query.edit_message_text("📩 Kirimkan daftar link (1 link per baris):")
-        return LINKS
-    elif data == 'manageip':
-        await show_ip_management(query)
-    elif data == 'addip':
-        await query.edit_message_text("➕ Kirim IP yang ingin ditambahkan:")
-        return ADD_IP
-    elif data == 'clearip':
-        save_ips([])
-        await query.edit_message_text("✅ Semua IP telah dihapus.")
-        await show_ip_management(query)
-    elif data.startswith('remove_'):
-        ip_to_remove = data[7:]
-        ips = load_ips()
-        if ip_to_remove in ips:
-            ips.remove(ip_to_remove)
-            save_ips(ips)
-            await query.edit_message_text(f"✅ IP {ip_to_remove} berhasil dihapus.")
-            await show_ip_management(query)
-        else:
-            await query.edit_message_text(f"⚠️ IP {ip_to_remove} tidak ditemukan.")
-    elif data == 'back':
-        await panel_from_query(query)
-
-async def handle_target_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Menangani pemilihan target (Rebuild/Looping)"""
-    query = update.callback_query
-    await query.answer()
-
-    global TARGET_TYPE
-    
-    if query.data == 'target_1':
-        TARGET_TYPE = "1"
-        await execute_start_all(query, "Rebuild")
-    elif query.data == 'target_2':
-        TARGET_TYPE = "2"
-        await execute_start_all(query, "Looping")
-    elif query.data == 'cancel_target':
-        await query.edit_message_text("❌ Eksekusi script dibatalkan.")
-        TARGET_TYPE = None
-
-async def execute_start_all(query, target_name):
-    """Eksekusi start all berdasarkan target yang dipilih"""
-    RDP_LIST = load_ips()
-    await query.edit_message_text(f"🔄 Memulai script ({target_name}) di semua RDP...")
-    
-    messages = []
-    for ip in RDP_LIST:
-        try:
-            res = requests.post(
-                f"http://{ip}:{PORT}/start-script",
-                json={"target": TARGET_TYPE},
-                timeout=5
-            )
-            messages.append(f"🔹 {ip} → {res.json().get('message', 'Success')}")
-        except Exception as e:
-            messages.append(f"🔴 {ip} → Error: {str(e)}")
-    
-    await query.edit_message_text("\n".join(messages))
-    TARGET_TYPE = None
-
-async def panel_from_query(query):
-    """Menampilkan panel utama dari query"""
-    keyboard = [
-        [InlineKeyboardButton("✅ Set Link & Jadwal", callback_data='setlink')],
-        [InlineKeyboardButton("▶️ Start All", callback_data='startall')],
-        [InlineKeyboardButton("⏹ Stop All", callback_data='stopall')],
-        [InlineKeyboardButton("⚙️ Manage IP", callback_data='manageip')]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text('🛠️ Panel Kontrol Bot - Pilih aksi:', reply_markup=reply_markup)
-
-async def show_ip_management(query):
-    """Menampilkan menu manajemen IP dengan daftar yang bisa diklik"""
-    current_ips = load_ips()
-    
-    ip_buttons = []
-    for ip in current_ips:
-        ip_buttons.append([InlineKeyboardButton(f"❌ {ip}", callback_data=f'remove_{ip}')])
-    
-    action_buttons = [
-        [InlineKeyboardButton("➕ Add IP", callback_data='addip')],
-        [InlineKeyboardButton("🗑 Clear All IP", callback_data='clearip')],
-        [InlineKeyboardButton("🔙 Kembali", callback_data='back')]
-    ]
-    
-    reply_markup = InlineKeyboardMarkup(ip_buttons + action_buttons)
-    
-    message = "📋 Daftar IP Saat Ini:\n" + "\n".join([f"• {ip}" for ip in current_ips]) if current_ips else "📭 Tidak ada IP terdaftar"
-    await query.edit_message_text(message, reply_markup=reply_markup)
-
-async def handle_start_all(query):
-    """Menangani permintaan start all dengan pilihan target"""
-    RDP_LIST = load_ips()
-    if not RDP_LIST:
-        await query.edit_message_text("⚠️ Belum ada IP yang terdaftar.")
-        return
-
-    keyboard = [
-        [InlineKeyboardButton("🔄 Rebuild", callback_data='target_1')],
-        [InlineKeyboardButton("🔁 Looping", callback_data='target_2')],
-        [InlineKeyboardButton("❌ Batal", callback_data='cancel_target')]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text("📡 Pilih jenis eksekusi script:", reply_markup=reply_markup)
-
-async def handle_stop_all(query):
-    """Menangani permintaan stop all"""
-    RDP_LIST = load_ips()
-    if not RDP_LIST:
-        await query.edit_message_text("⚠️ Belum ada IP yang terdaftar.")
-        return
-
-    await query.edit_message_text("🛑 Menghentikan script di semua RDP...")
-    messages = []
-    for ip in RDP_LIST:
-        try:
-            res = requests.post(f"http://{ip}:{PORT}/stop-script", timeout=5)
-            messages.append(f"🔹 {ip} → {res.json().get('message', 'Success')}")
-        except Exception as e:
-            messages.append(f"🔴 {ip} → Error: {str(e)}")
-    await query.edit_message_text("\n".join(messages))
-
-# ====== HANDLER SET LINK & JADWAL ======
-async def setlink_receive_links(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Menerima daftar link dari pengguna"""
-    links = [line.strip() for line in update.message.text.splitlines() if line.strip()]
-    if not links:
-        await update.message.reply_text("⚠️ Tidak ada link yang valid. Silakan coba lagi.")
+# ====== HANDLER CONVERSATION ======
+async def receive_links(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Menerima daftar link"""
+    if not update.message or not update.message.text:
+        await update.message.reply_text("⚠️ Input tidak valid")
         return ConversationHandler.END
-    
-    context.user_data['links'] = links
-    await update.message.reply_text("⏰ Kirim jam buka (format: HH:MM):")
-    return BUKA
+        
+    context.user_data['links'] = update.message.text.split('\n')
+    await update.message.reply_text("🕒 Masukkan jam BUKA (HH:MM):")
+    return SET_BUKA
 
-async def setlink_receive_buka(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Menerima jam buka dari pengguna"""
-    buka = update.message.text.strip()
-    if not validate_time_format(buka):
-        await update.message.reply_text("⚠️ Format waktu tidak valid. Gunakan format HH:MM. Silakan coba lagi.")
-        return BUKA
-    
-    context.user_data['buka'] = buka
-    await update.message.reply_text("⏰ Kirim jam tutup (format: HH:MM):")
-    return TUTUP
-
-async def setlink_receive_tutup(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Menerima jam tutup dari pengguna dan memprosesnya"""
-    tutup = update.message.text.strip()
-    if not validate_time_format(tutup):
-        await update.message.reply_text("⚠️ Format waktu tidak valid. Gunakan format HH:MM. Silakan coba lagi.")
-        return TUTUP
-    
-    context.user_data['tutup'] = tutup
-    links = context.user_data['links']
-    
-    try:
-        buka_jam, buka_menit = map(int, context.user_data['buka'].split(":"))
-        tutup_jam, tutup_menit = map(int, context.user_data['tutup'].split(":"))
-    except ValueError:
-        await update.message.reply_text("⚠️ Format waktu tidak valid. Silakan mulai kembali.")
+async def receive_buka(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Menerima jam buka"""
+    if not update.message or not update.message.text:
+        await update.message.reply_text("⚠️ Input tidak valid")
         return ConversationHandler.END
+        
+    if not re.match(r'^\d{2}:\d{2}$', update.message.text):
+        await update.message.reply_text("⚠️ Format jam salah. Gunakan HH:MM")
+        return SET_BUKA
+        
+    context.user_data['buka'] = update.message.text
+    await update.message.reply_text("🕒 Masukkan jam TUTUP (HH:MM):")
+    return SET_TUTUP
 
-    RDP_LIST = load_ips()
-    if not RDP_LIST:
-        await update.message.reply_text("⚠️ Belum ada IP yang ditambahkan. Tambahkan IP terlebih dahulu.")
+async def receive_tutup(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Menerima jam tutup dan memproses"""
+    if not update.message or not update.message.text:
+        await update.message.reply_text("⚠️ Input tidak valid")
         return ConversationHandler.END
-
-    chunk_size = len(links) // len(RDP_LIST)
-    chunks = [links[i:i + chunk_size] for i in range(0, len(links), chunk_size)]
-    if len(chunks) > len(RDP_LIST):
-        chunks[-2].extend(chunks[-1])
-        chunks = chunks[:-1]
-
-    messages = ["⚙️ Hasil pembaruan link dan jadwal:"]
-    for idx, ip in enumerate(RDP_LIST):
-        try:
-            payload_link = {
-                "link": "\n".join(chunks[idx]) if idx < len(chunks) else ""
-            }
-            res_link = requests.post(f"http://{ip}:{PORT}/update-link", json=payload_link, timeout=10)
-
-            payload_jadwal = {
-                "buka_jam": buka_jam,
-                "buka_menit": buka_menit,
-                "tutup_jam": tutup_jam,
-                "tutup_menit": tutup_menit
-            }
-            res_jadwal = requests.post(f"http://{ip}:{PORT}/update-waktu", json=payload_jadwal, timeout=10)
-
-            messages.append(f"🔹 {ip} → Link: {res_link.json().get('message', 'Success')} | Jadwal: {res_jadwal.json().get('message', 'Success')}")
-        except Exception as e:
-            messages.append(f"🔴 {ip} → Error: {str(e)}")
-
-    await update.message.reply_text("\n".join(messages))
+        
+    if not re.match(r'^\d{2}:\d{2}$', update.message.text):
+        await update.message.reply_text("⚠️ Format jam salah. Gunakan HH:MM")
+        return SET_TUTUP
+        
+    context.user_data['tutup'] = update.message.text
+    
+    # Proses data
+    await process_schedule(update, context)
     return ConversationHandler.END
 
-def validate_time_format(time_str):
-    """Validasi format waktu HH:MM"""
-    try:
-        hours, minutes = map(int, time_str.split(":"))
-        return 0 <= hours < 24 and 0 <= minutes < 60
-    except ValueError:
-        return False
-
-# ====== HANDLER TAMBAH IP ======
-async def add_ip(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Menambahkan IP baru ke daftar"""
+async def receive_ip(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Menerima IP baru"""
+    if not update.message or not update.message.text:
+        await update.message.reply_text("⚠️ Input tidak valid")
+        return ConversationHandler.END
+        
     ip = update.message.text.strip()
-    if not validate_ip(ip):
-        await update.message.reply_text("⚠️ Format IP tidak valid. Silakan coba lagi.")
+    if not re.match(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$', ip):
+        await update.message.reply_text("⚠️ Format IP salah. Contoh: 192.168.1.1")
         return ADD_IP
-    
+        
     ips = load_ips()
     if ip in ips:
-        await update.message.reply_text(f"ℹ️ IP {ip} sudah ada dalam daftar.")
+        await update.message.reply_text(f"ℹ️ IP {ip} sudah ada")
     else:
         ips.append(ip)
         save_ips(ips)
-        await update.message.reply_text(f"✅ IP {ip} berhasil ditambahkan.")
-    return ConversationHandler.END
-
-def validate_ip(ip):
-    """Validasi dasar format IP (sederhana)"""
-    parts = ip.split('.')
-    if len(parts) != 4:
-        return False
-    try:
-        return all(0 <= int(part) < 256 for part in parts)
-    except ValueError:
-        return False
-
-# ====== HANDLER PEMBATALAN ======
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Membatalkan operasi saat ini"""
-    await update.message.reply_text("❌ Operasi dibatalkan.")
-    return ConversationHandler.END
-
-# ====== INISIALISASI BOT ======
-if __name__ == '__main__':
-    print("🚀 Memulai bot...")
+        await update.message.reply_text(f"✅ IP {ip} ditambahkan")
     
+    await show_ip_menu(update.message)
+    return ConversationHandler.END
+
+# ====== FUNGSI PENDUKUNG ======
+async def process_schedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Memproses jadwal yang diinput"""
+    try:
+        links = context.user_data.get('links', [])
+        buka = context.user_data.get('buka', '').split(':')
+        tutup = context.user_data.get('tutup', '').split(':')
+        
+        # Validasi waktu
+        if len(buka) != 2 or len(tutup) != 2:
+            raise ValueError("Format waktu tidak valid")
+            
+        buka_jam, buka_menit = map(int, buka)
+        tutup_jam, tutup_menit = map(int, tutup)
+        
+        # Kirim ke semua RDP
+        results = []
+        for ip in load_ips():
+            try:
+                # Update link
+                res_link = requests.post(
+                    f"http://{ip}:{PORT}/update-link",
+                    json={"link": "\n".join(links)},
+                    timeout=10
+                )
+                
+                # Update jadwal
+                res_jadwal = requests.post(
+                    f"http://{ip}:{PORT}/update-waktu",
+                    json={
+                        "buka_jam": buka_jam,
+                        "buka_menit": buka_menit,
+                        "tutup_jam": tutup_jam,
+                        "tutup_menit": tutup_menit
+                    },
+                    timeout=10
+                )
+                
+                results.append(f"{ip}: Link={res_link.status_code}, Jadwal={res_jadwal.status_code}")
+            except Exception as e:
+                results.append(f"{ip}: Error - {str(e)}")
+                
+        await update.message.reply_text("📋 Hasil:\n" + "\n".join(results))
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ Error: {str(e)}")
+
+async def show_ip_menu(message):
+    """Menampilkan menu IP"""
+    ips = load_ips()
+    keyboard = [
+        [InlineKeyboardButton(f"❌ {ip}", callback_data=f'remove_{ip}')] for ip in ips
+    ] + [
+        [InlineKeyboardButton("➕ Add IP", callback_data='add_ip')],
+        [InlineKeyboardButton("🗑 Clear All", callback_data='clear_ip')],
+        [InlineKeyboardButton("🔙 Back", callback_data='back')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await message.reply_text(
+        "📋 Daftar IP:\n" + "\n".join(f"• {ip}" for ip in ips) if ips else "📭 Tidak ada IP",
+        reply_markup=reply_markup
+    )
+
+# ====== HANDLER TOMBOL ======
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    if query.data == 'set_link':
+        await query.edit_message_text("📩 Kirim link (1 per baris):")
+        return SET_LINK
+        
+    elif query.data == 'add_ip':
+        await query.edit_message_text("➕ Kirim IP (contoh: 192.168.1.1):")
+        return ADD_IP
+        
+    elif query.data.startswith('remove_'):
+        ip = query.data[7:]
+        ips = load_ips()
+        if ip in ips:
+            ips.remove(ip)
+            save_ips(ips)
+            await query.edit_message_text(f"✅ IP {ip} dihapus")
+        else:
+            await query.edit_message_text(f"⚠️ IP {ip} tidak ditemukan")
+        await show_ip_menu(query)
+        
+    elif query.data == 'clear_ip':
+        save_ips([])
+        await query.edit_message_text("✅ Semua IP dihapus")
+        await show_ip_menu(query)
+        
+    elif query.data == 'back':
+        await panel_from_query(query)
+        
+    elif query.data == 'start_all':
+        await start_all_rdp(query)
+        
+    elif query.data == 'stop_all':
+        await stop_all_rdp(query)
+
+async def panel_from_query(query):
+    keyboard = [
+        [InlineKeyboardButton("✅ Set Link & Jadwal", callback_data='set_link')],
+        [InlineKeyboardButton("⚙️ Manage IP", callback_data='manage_ip')],
+        [InlineKeyboardButton("▶️ Start All", callback_data='start_all')],
+        [InlineKeyboardButton("⏹ Stop All", callback_data='stop_all')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text('🛠️ Panel Kontrol:', reply_markup=reply_markup)
+
+# ====== FUNGSI RDP ======
+async def start_all_rdp(query):
+    """Menjalankan script di semua RDP"""
+    results = []
+    for ip in load_ips():
+        try:
+            res = requests.post(
+                f"http://{ip}:{PORT}/start-script",
+                json={"target": "1"},
+                timeout=5
+            )
+            results.append(f"{ip}: {res.status_code}")
+        except Exception as e:
+            results.append(f"{ip}: Error - {str(e)}")
+    await query.edit_message_text("🚀 Start All:\n" + "\n".join(results))
+
+async def stop_all_rdp(query):
+    """Menghentikan script di semua RDP"""
+    results = []
+    for ip in load_ips():
+        try:
+            res = requests.post(f"http://{ip}:{PORT}/stop-script", timeout=5)
+            results.append(f"{ip}: {res.status_code}")
+        except Exception as e:
+            results.append(f"{ip}: Error - {str(e)}")
+    await query.edit_message_text("🛑 Stop All:\n" + "\n".join(results))
+
+# ====== MAIN ======
+if __name__ == '__main__':
+    print("🚀 Starting bot...")
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # Handler perintah utama
+    # Handler utama
     app.add_handler(CommandHandler("panel", panel))
     
-    # Handler untuk tombol inline
-    app.add_handler(CallbackQueryHandler(
-        button_handler,
-        pattern='setlink|addip|removeip|startall|stopall|manageip|clearip|back'
-    ))
-    app.add_handler(CallbackQueryHandler(
-        handle_target_selection,
-        pattern='target_1|target_2|cancel_target'
-    ))
-    
-    # Handler untuk konversasi
+    # Conversation handler
     conv_handler = ConversationHandler(
-        entry_points=[CallbackQueryHandler(button_handler, pattern='setlink|addip')],
+        entry_points=[
+            CallbackQueryHandler(button_handler, pattern='^set_link$|^add_ip$')
+        ],
         states={
-            LINKS: [MessageHandler(filters.TEXT & ~filters.COMMAND, setlink_receive_links)],
-            BUKA: [MessageHandler(filters.TEXT & ~filters.COMMAND, setlink_receive_buka)],
-            TUTUP: [MessageHandler(filters.TEXT & ~filters.COMMAND, setlink_receive_tutup)],
-            ADD_IP: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_ip)],
+            SET_LINK: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_links)],
+            SET_BUKA: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_buka)],
+            SET_TUTUP: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_tutup)],
+            ADD_IP: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_ip)],
         },
-        fallbacks=[CommandHandler('cancel', cancel)],
+        fallbacks=[CommandHandler("cancel", cancel)],
     )
     app.add_handler(conv_handler)
+    
+    # Handler untuk tombol lainnya
+    app.add_handler(CallbackQueryHandler(button_handler, pattern='^manage_ip$|^remove_.*$|^clear_ip$|^back$|^start_all$|^stop_all$'))
 
-    print("🤖 Bot siap menerima perintah...")
+    print("🤖 Bot ready!")
     app.run_polling()
