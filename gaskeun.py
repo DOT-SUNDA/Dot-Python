@@ -11,7 +11,7 @@ import time
 import sys
 
 # Konfigurasi Waktu
-SLEEP_SEBELUM_AKSI = 30
+SLEEP_SEBELUM_AKSI = 60
 SLEEP_SESUDAH_AKSI = 30
 SLEEP_JIKA_ERROR = 10
 LOG_CLEAR_INTERVAL = 3600  # 1 jam dalam detik
