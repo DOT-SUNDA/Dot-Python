@@ -3,8 +3,8 @@ import os
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackQueryHandler, MessageHandler, ConversationHandler, filters
 
-BOT_TOKEN = 'ISI_TOKEN_BOT_KAMU'
-AUTHORIZED_USER_ID = 123456789  # Ganti dengan User ID kamu
+BOT_TOKEN = '8455364218:AAFoy_mvhZi9HYeTM48hO9aXapE-cYmWuCs'
+AUTHORIZED_USER_ID = 6501677690  # Ganti dengan User ID kamu
 
 LINKS, BUKA, TUTUP, ADD_IP, REMOVE_IP = range(5)
 PORT = 5000
