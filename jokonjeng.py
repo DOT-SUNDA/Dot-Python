@@ -1,14 +1,14 @@
 import requests
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, CallbackContext, MessageHandler, Filters
+from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, CallbackContext, MessageHandler, filters
 import json
 import os
 from datetime import datetime
 
 # Configuration
 DEFAULT_API_PORT = 5000
-TOKEN = "TOKEN_BOT_ANDA"  # Replace with your Telegram bot token
-ADMIN_IDS = [123456789]  # Replace with your admin ID(s)
+TOKEN = "8455364218:AAFoy_mvhZi9HYeTM48hO9aXapE-cYmWuCs"  # Replace with your Telegram bot token
+ADMIN_IDS = [6501677690]  # Replace with your admin ID(s)
 IP_LIST_FILE = "ip_list.json"  # File to store IP addresses
 
 # Initialize IP list
@@ -402,7 +402,7 @@ def main():
     dp.add_handler(CallbackQueryHandler(button_handler))
     
     # Message handlers
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
+    dp.add_handler(MessageHandler(filters.text & ~filters.command, handle_message))
     
     # Error handler
     dp.add_error_handler(error_handler)
