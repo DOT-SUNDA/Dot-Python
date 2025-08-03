@@ -1,4 +1,3 @@
-from multiprocessing import Process
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -6,17 +5,21 @@ from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
-import subprocess
-import pyautogui
 import time
 import os
 from datetime import datetime
 import sys
 import requests
+import uuid
+import json
 
+# Configuration
 SLEEP_SEBELUM_AKSI = 80
 SLEEP_SESUDAH_AKSI = 5
 SLEEP_JIKA_ERROR = 10
+VPS_ENDPOINT = "http://47.84.61.131:5000"  # Change to your VPS IP
+RDP_ID = str(uuid.uuid4())  # Unique identifier for this RDP
+MAX_RETRIES = 3  # Max retries for VPS communication
 
 def silent_excepthook(*args, **kwargs):
     pass
@@ -43,6 +46,25 @@ def get_options(user_data_dir, profile_dir):
         "profile.password_manager_enabled": False
     })
     return options
+
+def register_with_vps(profile_name):
+    """Register this RDP with the central VPS"""
+    for attempt in range(MAX_RETRIES):
+        try:
+            response = requests.post(
+                f"{VPS_ENDPOINT}/register_rdp",
+                json={
+                    "rdp_id": RDP_ID,
+                    "profile_name": profile_name
+                },
+                timeout=10
+            )
+            if response.status_code == 200:
+                return response.json().get('total_rdps', 1)
+        except Exception as e:
+            print(f"Registration attempt {attempt + 1} failed: {e}")
+            time.sleep(5)
+    return 1  # Default to 1 if registration fails
 
 def read_links_from_file(path):
     if not os.path.exists(path):
@@ -102,11 +124,7 @@ def open_terminal_and_run(driver):
             time.sleep(3)
 
         find_and_click_rebuild(driver)
-        driver.refresh()
-        actions = ActionChains(driver)
-        actions.send_keys(Keys.ENTER)
-        actions.perform()
-        return True
+        return False
     except Exception:
         return False
 
@@ -125,25 +143,37 @@ def process_single_link(driver, link):
         time.sleep(SLEEP_JIKA_ERROR)
         return False
 
-def send_to_telegram(file_path, caption):
-    token = '8455364218:AAFoy_mvhZi9HYeTM48hO9aXapE-cYmWuCs'
-    chat_id = '6501677690'
-    url = f'https://api.telegram.org/bot{token}/sendDocument'
-    
-    with open(file_path, 'rb') as f:
-        files = {'document': f}
-        data = {'chat_id': chat_id, 'caption': caption}
+def send_results_to_vps(success_links, failed_links, profile_name):
+    for attempt in range(MAX_RETRIES):
         try:
-            requests.post(url, files=files, data=data)
-            return True
-        except Exception:
-            return False
+            response = requests.post(
+                f"{VPS_ENDPOINT}/submit_results",
+                json={
+                    "rdp_id": RDP_ID,
+                    "profile_name": profile_name,
+                    "success_links": success_links,
+                    "failed_links": failed_links,
+                    "timestamp": datetime.now().isoformat()
+                },
+                timeout=15
+            )
+            if response.status_code == 200:
+                print(f"Successfully sent {len(success_links)} success and {len(failed_links)} failed links to VPS")
+                return True
+        except Exception as e:
+            print(f"Attempt {attempt + 1} failed to send results: {e}")
+            time.sleep(5)
+    return False
 
 def worker(profile_name, user_data_dir, profile_dir, window_position, links):
     if not links:
         return
+    
+    # Register with VPS first
+    total_rdps = register_with_vps(profile_name)
+    print(f"Registered with VPS. Total RDPs expected: {total_rdps}")
+    
     sys.stderr = open('nul', 'w')
-
     options = get_options(user_data_dir, profile_dir)
     driver = webdriver.Chrome(options=options)
 
@@ -154,44 +184,56 @@ def worker(profile_name, user_data_dir, profile_dir, window_position, links):
     failed_links = []
 
     for link in links:
-        trust_success = process_single_link(driver, link)
-        if trust_success:
-            success_links.append(link)
-            try:
-                open_ws = WebDriverWait(driver, 20).until(
-                    EC.element_to_be_clickable((By.XPATH, "//span[contains(text(), 'Open Workspace')]")))
-                open_ws.click()
-                time.sleep(2)
+        try:
+            trust_success = process_single_link(driver, link)
+            if trust_success:
+                success_links.append(link)
+                try:
+                    open_ws = WebDriverWait(driver, 20).until(
+                        EC.element_to_be_clickable((By.XPATH, "//span[contains(text(), 'Open Workspace')]")))
+                    open_ws.click()
+                    time.sleep(2)
+                    
+                    time.sleep(SLEEP_SEBELUM_AKSI)
+                    open_terminal_and_run(driver)
+                    time.sleep(SLEEP_SESUDAH_AKSI)
+                except Exception as e:
+                    print(f"Error processing successful link {link}: {e}")
+                    failed_links.append(link)
+            else:
+                failed_links.append(link)
                 
-                time.sleep(SLEEP_SEBELUM_AKSI)
-                open_terminal_and_run(driver)
-                time.sleep(SLEEP_SESUDAH_AKSI)
-            except Exception:
-                pass
-        else:
+            # Close all tabs except the first one
+            if len(driver.window_handles) > 1:
+                for handle in driver.window_handles[1:]:
+                    driver.switch_to.window(handle)
+                    driver.close()
+                driver.switch_to.window(driver.window_handles[0])
+                
+        except Exception as e:
+            print(f"Error processing link {link}: {e}")
             failed_links.append(link)
+            try:
+                # Try to recover the driver
+                driver.quit()
+                time.sleep(5)
+                driver = webdriver.Chrome(options=options)
+                if window_position:
+                    driver.set_window_position(*window_position)
+            except Exception as e:
+                print(f"Failed to recover driver: {e}")
+                # If we can't recover, break and try to send results
+                break
 
-    with open("sukses.txt", "a") as f:
-        f.write("\n".join(success_links) + "\n")
+    # Send results to central VPS
+    if not send_results_to_vps(success_links, failed_links, profile_name):
+        print("Failed to send results to VPS after multiple attempts")
     
-    with open("gagal.txt", "a") as f:
-        f.write("\n".join(failed_links) + "\n")
-    
-    if success_links:
-        temp_success = f"temp_sukses_{profile_name}.txt"
-        with open(temp_success, "w") as f:
-            f.write("\n".join(success_links))
-        send_to_telegram(temp_success, f"✅ {profile_name} - {len(success_links)} Link Trust Berhasil")
-        os.remove(temp_success)
-    
-    if failed_links:
-        temp_failed = f"temp_gagal_{profile_name}.txt"
-        with open(temp_failed, "w") as f:
-            f.write("\n".join(failed_links))
-        send_to_telegram(temp_failed, f"⚠️ {profile_name} - {len(failed_links)} Link Trust Gagal")
-        os.remove(temp_failed)
-
-    driver.quit()
+    try:
+        driver.quit()
+    except:
+        pass
+    print(f"Worker {profile_name} completed processing")
 
 if __name__ == "__main__":
     user_profiles = [
@@ -205,28 +247,18 @@ if __name__ == "__main__":
 
     all_links = read_links_from_file("link.txt")
     if not all_links:
+        print("No links found in link.txt")
         exit(1)
 
-    links_for_profiles = []
-    chunk_size = (len(all_links) + len(user_profiles) - 1) // len(user_profiles)
-    for i in range(0, len(all_links), chunk_size):
-        links_for_profiles.append(all_links[i:i + chunk_size])
-
-    processes = []
-    for i, profile in enumerate(user_profiles):
-        p = Process(target=worker, args=(
+    # Process each profile sequentially
+    for profile in user_profiles:
+        # Process all links in a single profile (no splitting)
+        worker(
             profile['name'],
             profile['user_data_dir'],
             profile['profile_dir'],
             profile['window_position'],
-            links_for_profiles[i],
-        ))
-        p.start()
-        processes.append(p)
+            all_links
+        )
 
-    try:
-        while True:
-            time.sleep(60)
-    except KeyboardInterrupt:
-        for p in processes:
-            p.terminate()
+    print("All workers completed processing")
