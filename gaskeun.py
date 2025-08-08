@@ -22,7 +22,6 @@ def get_options(user_data_dir, profile_dir):
     options.add_argument("--disable-features=InfiniteSessionRestore")
     options.add_argument("--window-size=500,500")
     options.add_argument("--disable-extensions")
-    options.add_argument("--headless=new")
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
