@@ -2,19 +2,20 @@
 
 # Daftar IP VPS
 VPS_LIST=(
-143.198.82.128
-165.232.172.105
-206.189.93.252
-157.230.243.219
-139.59.231.217
-143.198.211.75
-178.128.56.94
-167.71.215.44
-152.42.207.119
+143.198.196.235
+157.245.153.60
+128.199.222.1
+152.42.169.137
+68.183.232.142
+128.199.111.212
+128.199.234.31
+159.65.0.252
+128.199.146.77
+68.183.182.128
 )
 
 # Password SSH
-PASSWORD="VPS@2BULAN"
+PASSWORD="Dotaja123@HHHH"
 
 # Cek apakah expect tersedia
 if ! command -v expect &> /dev/null; then
@@ -38,7 +39,7 @@ expect {
 expect "#" {
     send -- "wget -O reinstall.sh https://raw.githubusercontent.com/bin456789/reinstall/refs/heads/main/reinstall.sh\r"
     expect "#"
-    send -- "bash reinstall.sh dd --img \"http://209.97.171.222/dotbot.gz\" --rdp-port 2003 --password \"jokoaja\"\r"
+    send -- "bash reinstall.sh dd --img \"https://dotvps.biz.id/dotbot.gz\" --rdp-port 2003 --password \"jokoaja\"\r"
     expect "#"
     send -- "reboot\r"
 }
