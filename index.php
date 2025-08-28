@@ -77,7 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if (empty($links_for_ip)) continue;
                     
                     $combined_links = implode("\n", $links_for_ip);
-                    $url = "https://$ip:" . PORT . "/update-link";
+                    $url = "http://$ip:" . PORT . "/update-link";
                     
                     $ch = curl_init();
                     curl_setopt($ch, CURLOPT_URL, $url);
@@ -114,7 +114,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 $results = [];
                 foreach ($ip_list as $ip) {
-                    $url = "https://$ip:" . PORT . "/update-waktu";
+                    $url = "http://$ip:" . PORT . "/update-waktu";
                     
                     $ch = curl_init();
                     curl_setopt($ch, CURLOPT_URL, $url);
@@ -151,7 +151,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 $results = [];
                 foreach ($ip_list as $ip) {
-                    $url = "https://$ip:" . PORT . "/start-script";
+                    $url = "http://$ip:" . PORT . "/start-script";
                     
                     $ch = curl_init();
                     curl_setopt($ch, CURLOPT_URL, $url);
@@ -187,7 +187,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 $results = [];
                 foreach ($ip_list as $ip) {
-                    $url = "https://$ip:" . PORT . "/stop-script";
+                    $url = "http://$ip:" . PORT . "/stop-script";
                     
                     $ch = curl_init();
                     curl_setopt($ch, CURLOPT_URL, $url);
@@ -232,7 +232,7 @@ unset($_SESSION['results']);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Control Panel Multi RDP</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="http://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <style>
         .modal { display: none; }
     </style>
@@ -244,7 +244,7 @@ unset($_SESSION['results']);
     <div class="mt-6 grid grid-cols-3 sm:grid-cols-5 gap-4 text-center">
         <button id="addIpBtn" class="flex flex-col items-center bg-blue-100 hover:bg-blue-200 text-blue-600 p-3 rounded-lg">
             <!-- Icon Tambah -->
-            <svg xmlns="https://www.w3.org/2000/svg" class="h-6 w-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
             </svg>
             <span class="text-sm">Tambah IP</span>
@@ -252,7 +252,7 @@ unset($_SESSION['results']);
         
         <button id="sendLinkBtn" class="flex flex-col items-center bg-blue-100 hover:bg-blue-200 text-blue-600 p-3 rounded-lg">
             <!-- Icon Link -->
-            <svg xmlns="https://www.w3.org/2000/svg" class="h-6 w-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 010 5.656m1.414-1.414a6 6 0 00-8.485-8.485m8.485 8.485L10.172 13.828" />
             </svg>
             <span class="text-sm">Kirim Link</span>
@@ -260,7 +260,7 @@ unset($_SESSION['results']);
 
         <button id="sendWaktuBtn" class="flex flex-col items-center bg-blue-100 hover:bg-blue-200 text-blue-600 p-3 rounded-lg">
             <!-- Icon Clock -->
-            <svg xmlns="https://www.w3.org/2000/svg" class="h-6 w-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <span class="text-sm">Kirim Waktu</span>
@@ -268,7 +268,7 @@ unset($_SESSION['results']);
 
         <button onclick="startFile(1)" class="flex flex-col items-center bg-purple-100 hover:bg-purple-200 text-purple-600 p-3 rounded-lg">
             <!-- Icon File 1 -->
-            <svg xmlns="https://www.w3.org/2000/svg" class="h-6 w-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
             <span class="text-sm">Start Awal</span>
@@ -276,7 +276,7 @@ unset($_SESSION['results']);
 
         <button onclick="startFile(2)" class="flex flex-col items-center bg-indigo-100 hover:bg-indigo-200 text-indigo-600 p-3 rounded-lg">
             <!-- Icon File 2 -->
-            <svg xmlns="https://www.w3.org/2000/svg" class="h-6 w-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
             <span class="text-sm">Start Loop</span>
@@ -284,7 +284,7 @@ unset($_SESSION['results']);
 
         <button id="stopBtn" class="flex flex-col items-center bg-red-100 hover:bg-red-200 text-red-600 p-3 rounded-lg">
             <!-- Icon Stop -->
-            <svg xmlns="https://www.w3.org/2000/svg" class="h-6 w-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
             <span class="text-sm">Stop</span>
@@ -345,7 +345,7 @@ unset($_SESSION['results']);
         <form method="POST" action="">
             <input type="hidden" name="action" value="send_link">
             <label class="block mt-4">Link (satu per baris):</label>
-            <textarea name="links" rows="5" class="border border-gray-300 rounded w-full p-2 mt-1" placeholder="https://example.com/page1&#10;https://example.com/page2"></textarea>
+            <textarea name="links" rows="5" class="border border-gray-300 rounded w-full p-2 mt-1" placeholder="http://example.com/page1&#10;http://example.com/page2"></textarea>
             <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded mt-4 hover:bg-blue-600">Kirim Link ke IP</button>
         </form>
     </div>
