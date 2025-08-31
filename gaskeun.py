@@ -8,8 +8,8 @@ from selenium.webdriver.support import expected_conditions as EC
 import os
 import time
 
-SLEEP_SEBELUM_AKSI = 30
-SLEEP_SESUDAH_AKSI = 30
+SLEEP_SEBELUM_AKSI = 50
+SLEEP_SESUDAH_AKSI = 10
 SLEEP_JIKA_ERROR = 10
 
 def get_options(user_data_dir, profile_dir):
