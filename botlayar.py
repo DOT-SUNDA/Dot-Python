@@ -5,17 +5,12 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from datetime import datetime
 import os
 import time
 
-SLEEP_SEBELUM_AKSI = 30
-SLEEP_SESUDAH_AKSI = 30
+SLEEP_SEBELUM_AKSI = 50
+SLEEP_SESUDAH_AKSI = 10
 SLEEP_JIKA_ERROR = 10
-
-def log_sukses(profile_name, current, total):
-    # Mudah diubah, misalnya log ke file atau tampilkan lebih detail
-    print(f"[{datetime.now().strftime('%H:%M:%S')}] {profile_name} berhasil proses link {current}/{total}", flush=True)
 
 def get_options(user_data_dir, profile_dir):
     options = webdriver.ChromeOptions()
@@ -29,6 +24,7 @@ def get_options(user_data_dir, profile_dir):
     options.add_argument("--disable-extensions")
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
+    options.add_argument("--proxy-server=http://3.79.73.102:8080")
     options.add_argument("--disable-dev-shm-usage")
     options.add_experimental_option("excludeSwitches", ["enable-automation", "enable-logging"])
     options.add_experimental_option("prefs", {
@@ -79,7 +75,6 @@ def worker(profile_name, user_data_dir, profile_dir, window_position, links, bar
     options = get_options(user_data_dir, profile_dir)
     driver = webdriver.Chrome(options=options)
 
-    # Atur posisi jendela
     if window_position:
         driver.set_window_position(*window_position)
 
@@ -91,10 +86,9 @@ def worker(profile_name, user_data_dir, profile_dir, window_position, links, bar
         success = process_single_link(driver, links[index])
         if success:
             count += 1
-            log_sukses(profile_name, count, total)
 
         try:
-            barrier.wait()  # Tunggu semua proses sebelum lanjut
+            barrier.wait()
         except:
             break
 
@@ -118,10 +112,8 @@ if __name__ == "__main__":
 
     all_links = read_links_from_file("link.txt")
     if not all_links:
-        print("link.txt kosong, keluar.")
         exit(1)
 
-    # Bagi link ke masing-masing profil
     links_for_profiles = [[] for _ in user_profiles]
     for i, link in enumerate(all_links):
         links_for_profiles[i % len(user_profiles)].append(link)
@@ -145,6 +137,5 @@ if __name__ == "__main__":
         while True:
             time.sleep(60)
     except KeyboardInterrupt:
-        print("Dihentikan oleh pengguna.")
         for p in processes:
             p.terminate()
