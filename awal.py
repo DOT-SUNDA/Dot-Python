@@ -70,9 +70,10 @@ def read_links_from_file(file_path):
     return [link.strip() for link in links if link.strip()]
 
 def find_and_click_rebuild(driver):
+    found = False
     try:
         iframes = driver.find_elements(By.TAG_NAME, "iframe")
-        for i, iframe in enumerate(iframes):
+        for iframe in iframes:
             driver.switch_to.frame(iframe)
             try:
                 rebuild_btn = WebDriverWait(driver, 3).until(
@@ -82,15 +83,25 @@ def find_and_click_rebuild(driver):
                     driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", rebuild_btn)
                     time.sleep(0.5)
                     driver.execute_script("arguments[0].click();", rebuild_btn)
-                    return True
+                    
+                    # Tambahan setelah klik rebuild
+                    time.sleep(3)
+                    actions = ActionChains(driver)
+                    actions.send_keys(Keys.ENTER)
+                    actions.perform()
+
+                    found = True
+                    break
             except TimeoutException:
                 pass
-            finally:
-                driver.switch_to.default_content()
-        return False
     except Exception:
+        pass
+    finally:
+        # Apapun hasilnya, selalu kembali ke default_content
         driver.switch_to.default_content()
-        return False
+
+    return found
+
 
 def open_terminal_and_run(driver):
     try:
@@ -114,11 +125,6 @@ def open_terminal_and_run(driver):
             actions.send_keys(Keys.ENTER)
             actions.perform()
             time.sleep(2)
-
-            actions = ActionChains(driver)
-            actions.send_keys(Keys.ENTER)
-            actions.perform()
-            time.sleep(3)
 
             actions = ActionChains(driver)
             actions.send_keys(Keys.ENTER)
@@ -248,3 +254,4 @@ def main():
 if __name__ == "__main__":
     main()
     
+
